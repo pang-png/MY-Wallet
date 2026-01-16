@@ -3,57 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wallet Test</title>
+    <title>Financial Health Grade</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-        .box { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #ddd; box-sizing: border-box; }
-        button { background: #4a90e2; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .list-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; }
+        :root { --primary: #4a90e2; --income: #2ecc71; --expense: #e74c3c; --bg: #f4f7f9; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 480px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        
+        /* การ์ดเกรด */
+        .grade-card { padding: 25px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px; background: #999; transition: 0.5s; }
+        .grade-letter { font-size: 5rem; font-weight: bold; margin: 0; }
+        .advice { background: rgba(0,0,0,0.1); padding: 12px; border-radius: 10px; font-size: 0.9rem; text-align: left; margin-top: 10px; }
+
+        .status-A { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .status-B { background: linear-gradient(135deg, #a2d240, #8eb233); }
+        .status-C { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #333; }
+        .status-D { background: linear-gradient(135deg, #e67e22, #d35400); }
+        .status-F { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+
+        .stats { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 15px; }
+        .stats div { text-align: center; }
+        
+        input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; border-bottom: 4px solid #357abd; }
+        button:active { margin-top: 10px; border-bottom: 0; }
+        
+        .history { margin-top: 25px; border-top: 2px solid #eee; padding-top: 15px; }
+        .item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <h3>💰 ทดสอบบันทึก</h3>
-    <input type="text" id="t_desc" placeholder="รายการ">
-    <input type="number" id="t_amt" placeholder="จำนวนเงิน">
-    <button id="saveBtn">บันทึกเดี๋ยวนี้</button>
-    <div id="display"></div>
+<div class="container">
+    <div id="gradeBox" class="grade-card">
+        <div style="font-weight: bold;">เกรดสุขภาพการเงิน</div>
+        <div id="gradeLetter" class="grade-letter">-</div>
+        <div id="gradeLabel" style="font-size: 1.2rem; font-weight: bold;">รอข้อมูล</div>
+        <div id="adviceText" class="advice">เริ่มบันทึกรายรับ-รายจ่ายเพื่อดูเกรดและแนวทางแก้ไข</div>
+    </div>
+
+    <div class="stats">
+        <div>รายรับ<br><b id="totalInc" style="color:var(--income)">0</b></div>
+        <div>รายจ่าย<br><b id="totalExp" style="color:var(--expense)">0</b></div>
+    </div>
+
+    <div style="max-width: 200px; margin: auto;">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <input type="text" id="desc" placeholder="รายการ">
+        <input type="number" id="amt" placeholder="จำนวนเงิน">
+        <select id="type">
+            <option value="exp">🔴 รายจ่าย</option>
+            <option value="inc">🟢 รายรับ</option>
+        </select>
+        <button id="addBtn">บันทึกรายการ</button>
+    </div>
+
+    <div id="historyList" class="history"></div>
+    <button onclick="resetData()" style="background:#eee; color:#666; font-size:0.7rem; border:none; margin-top:50px;">ล้างข้อมูลทั้งหมด</button>
 </div>
 
 <script>
-    // ดึงข้อมูลเก่า
-    let items = JSON.parse(localStorage.getItem('test_data')) || [];
+    let db = JSON.parse(localStorage.getItem('my_wallet_vfinal')) || [];
+    let chartObj = null;
 
-    function showData() {
-        const div = document.getElementById('display');
-        div.innerHTML = '<h4>ประวัติ:</h4>';
-        items.forEach(i => {
-            div.innerHTML += <div class="list-item"><span>${i.desc}</span> <b>${i.amt}</b></div>;
+    function render() {
+        const list = document.getElementById('historyList');
+        let inc = 0, exp = 0;
+        list.innerHTML = '<b>ประวัติรายการ:</b>';
+
+        db.forEach(item => {
+            if(item.type === 'inc') inc += item.amt; else exp += item.amt;
+            list.innerHTML += `
+                <div class="item">
+                    <span>${item.desc}</span>
+                    <b style="color:${item.type === 'inc' ? '#2ecc71' : '#e74c3c'}">
+                        ${item.type === 'inc' ? '+' : '-'}${item.amt.toLocaleString()}
+                    </b>
+                </div>`;
+        });
+
+        document.getElementById('totalInc').innerText = inc.toLocaleString();
+        document.getElementById('totalExp').innerText = exp.toLocaleString();
+
+        updateGrade(inc, exp);
+        updateChart(inc, exp);
+    }
+
+    function updateGrade(inc, exp) {
+        const box = document.getElementById('gradeBox');
+        const letter = document.getElementById('gradeLetter');
+        const label = document.getElementById('gradeLabel');
+        const advice = document.getElementById('adviceText');
+
+        if (inc === 0) return;
+
+        const ratio = (exp / inc) * 100;
+        let g, lb, ad, cl;
+
+        if (ratio <= 30) { g='A'; lb='ดีเยี่ยม'; cl='status-A'; ad='💡 แนวทาง: สภาพคล่องดีมาก นำเงินส่วนที่เหลือไปลงทุนต่อยอด'; }
+        else if (ratio <= 50) { g='B'; lb='ดี'; cl='status-B'; ad='💡 แนวทาง: บริหารเงินได้ดี ควรสำรองเงินฉุกเฉินให้ครบ 6 เดือน'; }
+        else if (ratio <= 75) { g='C'; lb='เริ่มเสี่ยง'; cl='status-C'; ad='⚠️ ความเสี่ยง: ออมน้อยไปหน่อย ลองตัดรายจ่ายฟุ่มเฟือยออก 10%'; }
+        else if (ratio <= 95) { g='D'; lb='อันตราย'; cl='status-D'; ad='🚨 ความเสี่ยง: เงินเดือนเกือบชนเดือน ห้ามสร้างหนี้ใหม่เด็ดขาด'; }
+        else { g='F'; lb='วิกฤต'; cl='status-F'; ad='❌ วิกฤต: รายจ่ายท่วมรายรับ รีบจดบันทึกและลดค่าใช้จ่ายทันที'; }
+
+        box.className = 'grade-card ' + cl;
+        letter.innerText = g;
+        label.innerText = lb + ' (ใช้จ่าย ' + ratio.toFixed(0) + '%)';
+        advice.innerText = ad;
+    }
+
+    function updateChart(inc, exp) {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        if (chartObj) chartObj.destroy();
+        chartObj = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['รับ', 'จ่าย'],
+                datasets: [{ data: [inc || 1, exp], backgroundColor: ['#2ecc71', '#e74c3c'] }]
+            },
+            options: { plugins: { legend: { display: false } } }
         });
     }
 
-    // เมื่อกดปุ่มบันทึก
-    document.getElementById('saveBtn').onclick = function() {
-        const d = document.getElementById('t_desc').value;
-        const a = document.getElementById('t_amt').value;
+    document.getElementById('addBtn').onclick = function() {
+        const d = document.getElementById('desc').value;
+        const a = parseFloat(document.getElementById('amt').value);
+        const t = document.getElementById('type').value;
 
-        if(!d || !a) {
-            alert('กรุณากรอกให้ครบ');
-            return;
-        }
+        if(!d || !a) { alert('กรุณากรอกข้อมูล'); return; }
 
-        items.unshift({ desc: d, amt: a });
-        localStorage.setItem('test_data', JSON.stringify(items));
+        db.unshift({ desc: d, amt: a, type: t });
+        localStorage.setItem('my_wallet_vfinal', JSON.stringify(db));
         
-        document.getElementById('t_desc').value = '';
-        document.getElementById('t_amt').value = '';
-        showData();
-        alert('บันทึกสำเร็จ!');
+        document.getElementById('desc').value = '';
+        document.getElementById('amt').value = '';
+        render();
     };
 
-    window.onload = showData;
+    function resetData() { if(confirm('ลบข้อมูลทั้งหมด?')) { db = []; localStorage.removeItem('my_wallet_vfinal'); render(); } }
+
+    window.onload = render;
 </script>
 
 </body>
