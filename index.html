@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Analysis Pro + Savings Goal</title>
+    <title>Financial Planner Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #4a90e2; --income: #2ecc71; --expense: #e74c3c; --saving: #f39c12; --bg: #f4f7f9; }
@@ -19,8 +19,8 @@
         .status-F { background: linear-gradient(135deg, #e74c3c, #c0392b); }
 
         /* ส่วนเป้าหมายเงินออม */
-        .savings-goal-card { background: #fff9e6; border: 1px dashed var(--saving); padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
-        .savings-goal-card b { color: var(--saving); font-size: 1.2rem; }
+        .savings-goal-card { background: #e8f5e9; border: 1px solid var(--income); padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: center; }
+        .savings-goal-card b { color: #2e7d32; font-size: 1.2rem; }
 
         .stats { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 15px; }
         .top-five { background: #fff5f5; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #ffe3e3; }
@@ -33,7 +33,6 @@
         
         .item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
         .delete-btn { color: #ccc; cursor: pointer; font-size: 0.7rem; }
-        .delete-btn:hover { color: red; }
     </style>
 </head>
 <body>
@@ -46,8 +45,7 @@
     </div>
 
     <div id="savingsGoalBox" class="savings-goal-card" style="display:none;">
-        <div>💰 เป้าหมายออมขั้นต่ำ (10% ของรายรับ): <b id="targetSaving">0</b></div>
-        <div id="savingsAnalysis" style="font-size: 0.85rem; margin-top: 5px; color: #666;"></div>
+        <div id="savingsAnalysis"></div>
     </div>
 
     <div class="stats">
@@ -56,7 +54,7 @@
         <div>คงเหลือ<br><b id="totalBal">0</b></div>
     </div>
 
-    <div style="position: relative; margin: auto; height:220px; width:100%">
+    <div style="position: relative; margin: auto; height:250px; width:100%">
         <canvas id="myChart"></canvas>
     </div>
 
@@ -80,7 +78,7 @@
 </div>
 
 <script>
-    let db = JSON.parse(localStorage.getItem('my_wallet_pro_v6')) || [];
+    let db = JSON.parse(localStorage.getItem('my_wallet_v7')) || [];
     let chartObj = null;
 
     function formatNumber(input) {
@@ -123,24 +121,28 @@
 
     function updateSavingsGoal(inc, balance) {
         const box = document.getElementById('savingsGoalBox');
-        const targetEl = document.getElementById('targetSaving');
         const analysisEl = document.getElementById('savingsAnalysis');
 
         if (inc <= 0) { box.style.display = 'none'; return; }
         
         box.style.display = 'block';
         const targetSaving = inc * 0.10;
-        targetEl.innerText = targetSaving.toLocaleString();
 
         if (balance >= targetSaving) {
-            analysisEl.innerHTML = "✅ ยอดเยี่ยม! ตอนนี้คุณมีเงินคงเหลือมากกว่า 10% ตามเป้าหมาย";
-            analysisEl.style.color = "green";
+            box.style.background = "#e8f5e9";
+            box.style.borderColor = "var(--income)";
+            analysisEl.innerHTML = `✅ <b>ตอนนี้คุณมีเงินคงเหลือมากกว่าเป้าหมายแล้ว</b><br>ยอดเงินคงเหลือปัจจุบันของคุณคือ <b>${balance.toLocaleString()}</b> บาท`;
+            analysisEl.style.color = "#2e7d32";
         } else if (balance > 0) {
-            analysisEl.innerHTML = "⚠️ ระวัง! เงินคงเหลือน้อยกว่า 10% ของรายรับ (ขาดอีก " + (targetSaving - balance).toLocaleString() + ")";
-            analysisEl.style.color = "#d35400";
+            box.style.background = "#fff3e0";
+            box.style.borderColor = "#ff9800";
+            analysisEl.innerHTML = `⚠️ เงินออมยังไม่ถึงเป้าหมาย 10% (${targetSaving.toLocaleString()})<br>คงเหลือจริง: <b>${balance.toLocaleString()}</b> บาท`;
+            analysisEl.style.color = "#e65100";
         } else {
-            analysisEl.innerHTML = "❌ วิกฤต! คุณไม่มีเงินออมเหลือเลย พยายามลดรายจ่ายด่วน";
-            analysisEl.style.color = "red";
+            box.style.background = "#ffebee";
+            box.style.borderColor = "var(--expense)";
+            analysisEl.innerHTML = `❌ <b>วิกฤต! คุณไม่มีเงินออมเหลือเลย</b><br>ยอดคงเหลือติดลบ/ศูนย์: <b>${balance.toLocaleString()}</b> บาท`;
+            analysisEl.style.color = "#c62828";
         }
     }
 
@@ -175,20 +177,41 @@
     function updateChart(data) {
         const ctx = document.getElementById('myChart').getContext('2d');
         if (chartObj) chartObj.destroy();
+
+        // รวมยอดตามรายการ
         const summary = data.reduce((acc, curr) => {
-            acc[curr.desc] = (acc[curr.desc] || 0) + curr.amt;
+            const key = curr.desc;
+            if (!acc[key]) acc[key] = { amt: 0, type: curr.type };
+            acc[key].amt += curr.amt;
             return acc;
         }, {});
+
         const labels = Object.keys(summary);
-        const values = Object.values(summary);
-        const colors = labels.map(label => {
-            const item = data.find(d => d.desc === label);
-            return item.type === 'inc' ? `rgba(46, 204, 113, 0.7)` : `rgba(231, 76, 60, 0.7)`;
-        });
+        const values = labels.map(l => summary[l].amt);
+        const colors = labels.map(l => summary[l].type === 'inc' ? '#2ecc71' : '#e74c3c');
+
         chartObj = new Chart(ctx, {
             type: 'pie',
-            data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => ` ${context.label}: ${context.raw.toLocaleString()} บาท`
+                        }
+                    }
+                }
+            }
         });
     }
 
@@ -198,7 +221,7 @@
         const t = document.getElementById('type').value;
         if(!d || isNaN(a)) return;
         db.unshift({ desc: d, amt: a, type: t });
-        localStorage.setItem('my_wallet_pro_v6', JSON.stringify(db));
+        localStorage.setItem('my_wallet_v7', JSON.stringify(db));
         document.getElementById('desc').value = '';
         document.getElementById('amt').value = '';
         render();
@@ -207,12 +230,12 @@
     function deleteItem(index) {
         if(confirm('ลบรายการนี้?')) {
             db.splice(index, 1);
-            localStorage.setItem('my_wallet_pro_v6', JSON.stringify(db));
+            localStorage.setItem('my_wallet_v7', JSON.stringify(db));
             render();
         }
     }
 
-    function resetData() { if(confirm('ล้างข้อมูลทั้งหมด?')) { db=[]; localStorage.removeItem('my_wallet_pro_v6'); render(); } }
+    function resetData() { if(confirm('ล้างข้อมูลทั้งหมด?')) { db=[]; localStorage.removeItem('my_wallet_v7'); render(); } }
     window.onload = render;
 </script>
 
