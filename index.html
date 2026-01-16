@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Test</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+        .box { background: white; padding: 20px; border-radius: 10px; max-width: 400px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { background: #4a90e2; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .list-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h3>💰 ทดสอบบันทึก</h3>
+    <input type="text" id="t_desc" placeholder="รายการ">
+    <input type="number" id="t_amt" placeholder="จำนวนเงิน">
+    <button id="saveBtn">บันทึกเดี๋ยวนี้</button>
+    <div id="display"></div>
+</div>
+
+<script>
+    // ดึงข้อมูลเก่า
+    let items = JSON.parse(localStorage.getItem('test_data')) || [];
+
+    function showData() {
+        const div = document.getElementById('display');
+        div.innerHTML = '<h4>ประวัติ:</h4>';
+        items.forEach(i => {
+            div.innerHTML += <div class="list-item"><span>${i.desc}</span> <b>${i.amt}</b></div>;
+        });
+    }
+
+    // เมื่อกดปุ่มบันทึก
+    document.getElementById('saveBtn').onclick = function() {
+        const d = document.getElementById('t_desc').value;
+        const a = document.getElementById('t_amt').value;
+
+        if(!d || !a) {
+            alert('กรุณากรอกให้ครบ');
+            return;
+        }
+
+        items.unshift({ desc: d, amt: a });
+        localStorage.setItem('test_data', JSON.stringify(items));
+        
+        document.getElementById('t_desc').value = '';
+        document.getElementById('t_amt').value = '';
+        showData();
+        alert('บันทึกสำเร็จ!');
+    };
+
+    window.onload = showData;
+</script>
+
+</body>
+</html>
