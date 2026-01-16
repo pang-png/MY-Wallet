@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Planner Pro - Savings Target</title>
+    <title>Financial Analysis Pro Full</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #4a90e2; --income: #2ecc71; --expense: #e74c3c; --saving: #f39c12; --bg: #f4f7f9; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
         .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         
+        /* เกรดและการวิเคราะห์ */
         .grade-card { padding: 20px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px; transition: 0.5s; }
         .grade-letter { font-size: 4.5rem; font-weight: bold; margin: 0; }
         .status-A { background: linear-gradient(135deg, #2ecc71, #27ae60); }
@@ -18,23 +19,21 @@
         .status-D { background: linear-gradient(135deg, #e67e22, #d35400); }
         .status-F { background: linear-gradient(135deg, #e74c3c, #c0392b); }
 
+        .advice-box { background: rgba(0,0,0,0.1); padding: 12px; border-radius: 10px; font-size: 0.9rem; text-align: left; margin-top: 10px; line-height: 1.4; }
+
         /* ส่วนเป้าหมายเงินออม */
         .savings-goal-card { border-radius: 15px; padding: 18px; margin-bottom: 20px; text-align: center; border: 2px solid transparent; }
-        .savings-goal-card p { margin: 5px 0; line-height: 1.5; }
         .target-val { color: var(--saving); font-weight: bold; font-size: 1.1rem; }
-        .balance-val { font-weight: bold; font-size: 1.2rem; }
 
         .stats { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 15px; }
         .top-five { background: #fff5f5; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #ffe3e3; }
-        .top-five h4 { margin-top: 0; color: var(--expense); border-bottom: 1px solid #ffcfcf; padding-bottom: 5px; }
-        .top-item { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 3px 0; }
-
+        .top-five h4 { margin: 0 0 10px 0; color: var(--expense); border-bottom: 1px solid #ffcfcf; }
+        
         input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; box-sizing: border-box; outline: none; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; border-bottom: 4px solid #357abd; }
         button:active { border-bottom: 0; transform: translateY(4px); }
         
         .item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
-        .delete-btn { color: #ccc; cursor: pointer; font-size: 0.7rem; }
     </style>
 </head>
 <body>
@@ -43,12 +42,13 @@
     <div id="gradeBox" class="grade-card status-C">
         <div style="font-weight: bold;">เกรดการเงิน</div>
         <div id="gradeLetter" class="grade-letter">-</div>
-        <div id="gradeLabel" style="font-size: 1.1rem; font-weight: bold;">รอข้อมูลบันทึก</div>
+        <div id="gradeLabel" style="font-size: 1.1rem; font-weight: bold;">กรุณาบันทึกข้อมูล</div>
+        <div id="riskAdvice" class="advice-box">บันทึกรายรับ-รายจ่าย เพื่อให้ระบบวิเคราะห์ความเสี่ยงและแนวทางแก้ไข</div>
     </div>
 
     <div id="savingsGoalBox" class="savings-goal-card" style="display:none;">
-        <p>🎯 เป้าหมายการออม 10% ของรายรับของคุณคือ <span id="targetValue" class="target-val">0</span> บาท</p>
-        <p id="savingsAnalysis"></p>
+        <p style="margin:0 0 10px 0;">🎯 เป้าหมายการออม 10% ของรายรับของคุณคือ <span id="targetValue" class="target-val">0</span> บาท</p>
+        <div id="savingsAnalysis" style="font-size: 0.95rem; line-height: 1.5;"></div>
     </div>
 
     <div class="stats">
@@ -57,7 +57,7 @@
         <div>คงเหลือ<br><b id="totalBal">0</b></div>
     </div>
 
-    <div style="position: relative; margin: auto; height:250px; width:100%">
+    <div style="position: relative; margin: auto; height:220px; width:100%">
         <canvas id="myChart"></canvas>
     </div>
 
@@ -73,7 +73,7 @@
             <option value="exp">🔴 รายจ่าย (แดง)</option>
             <option value="inc">🟢 รายรับ (เขียว)</option>
         </select>
-        <button id="addBtn">บันทึกข้อมูล</button>
+        <button id="addBtn">บันทึกและวิเคราะห์</button>
     </div>
 
     <div id="historyList" style="margin-top:20px;"></div>
@@ -81,7 +81,7 @@
 </div>
 
 <script>
-    let db = JSON.parse(localStorage.getItem('my_wallet_v8')) || [];
+    let db = JSON.parse(localStorage.getItem('my_wallet_v9')) || [];
     let chartObj = null;
 
     function formatNumber(input) {
@@ -106,7 +106,7 @@
                     <span>${item.desc}</span>
                     <div style="text-align:right">
                         <b style="color:${item.type==='inc'?'#2ecc71':'#e74c3c'}">${item.amt.toLocaleString()}</b>
-                        <br><span class="delete-btn" onclick="deleteItem(${index})">ลบ</span>
+                        <br><span style="color:#ccc; cursor:pointer; font-size:0.7rem;" onclick="deleteItem(${index})">ลบ</span>
                     </div>
                 </div>`;
         });
@@ -116,10 +116,43 @@
         document.getElementById('totalExp').innerText = exp.toLocaleString();
         document.getElementById('totalBal').innerText = balance.toLocaleString();
 
+        updateGradeAndAdvice(inc, exp);
         updateSavingsGoal(inc, balance);
         updateTopFive(expensesOnly);
-        updateGrade(inc, exp);
         updateChart(db);
+    }
+
+    function updateGradeAndAdvice(inc, exp) {
+        const box = document.getElementById('gradeBox');
+        const letter = document.getElementById('gradeLetter');
+        const label = document.getElementById('gradeLabel');
+        const advice = document.getElementById('riskAdvice');
+
+        if (inc === 0) return;
+        const ratio = (exp / inc) * 100;
+        let g, cl, msg;
+
+        if (ratio <= 35) { 
+            g='A'; cl='status-A'; 
+            msg='✅ <b>ความเสี่ยงต่ำมาก:</b> สุขภาพการเงินดีเยี่ยม แนวทางคือเริ่มนำเงินออมไปลงทุนในสินทรัพย์ที่ชนะเงินเฟ้อ';
+        } else if (ratio <= 50) { 
+            g='B'; cl='status-B'; 
+            msg='✅ <b>ความเสี่ยงต่ำ:</b> บริหารเงินได้ดี ควรสำรองเงินฉุกเฉินให้ครบ 6 เดือนของค่าใช้จ่าย';
+        } else if (ratio <= 75) { 
+            g='C'; cl='status-C'; 
+            msg='⚠️ <b>ความเสี่ยงปานกลาง:</b> เริ่มมีเงินเก็บน้อย ลองตรวจสอบรายจ่ายฟุ่มเฟือยและตัดออก 10%';
+        } else if (ratio <= 95) { 
+            g='D'; cl='status-D'; 
+            msg='🚨 <b>ความเสี่ยงสูง:</b> รายจ่ายเกือบเท่ารายรับ หากเกิดเหตุฉุกเฉินเงินจะไม่พอใช้ ควรหารายได้เสริมด่วน';
+        } else { 
+            g='F'; cl='status-F'; 
+            msg='❌ <b>ความเสี่ยงวิกฤต:</b> รายจ่ายท่วมรายรับ เสี่ยงต่อการเป็นหนี้สินล้นตัว รีบตัดรายจ่ายไม่จำเป็นออกทั้งหมดทันที';
+        }
+
+        box.className = 'grade-card ' + cl;
+        letter.innerText = g;
+        label.innerText = `ใช้จ่ายไป ${ratio.toFixed(0)}% ของรายรับ`;
+        advice.innerHTML = msg;
     }
 
     function updateSavingsGoal(inc, balance) {
@@ -128,23 +161,19 @@
         const analysisEl = document.getElementById('savingsAnalysis');
 
         if (inc <= 0) { box.style.display = 'none'; return; }
-        
         box.style.display = 'block';
         const targetSaving = inc * 0.10;
         targetEl.innerText = targetSaving.toLocaleString();
 
         if (balance >= targetSaving) {
-            box.style.background = "#e8f5e9";
-            box.style.borderColor = "var(--income)";
-            analysisEl.innerHTML = `✅ <b>ตอนนี้คุณมีเงินคงเหลือมากกว่าเป้าหมายแล้ว</b><br>ยอดเงินคงเหลือปัจจุบันของคุณคือ <span class="balance-val" style="color:#2e7d32">${balance.toLocaleString()}</span> บาท`;
+            box.style.background = "#e8f5e9"; box.style.borderColor = "#2ecc71";
+            analysisEl.innerHTML = `✅ <b>ตอนนี้คุณมีเงินคงเหลือมากกว่าเป้าหมายแล้ว</b><br>ยอดเงินคงเหลือปัจจุบันของคุณคือ <b style="color:#2e7d32">${balance.toLocaleString()}</b> บาท`;
         } else if (balance > 0) {
-            box.style.background = "#fff3e0";
-            box.style.borderColor = "#ff9800";
-            analysisEl.innerHTML = `⚠️ เงินออมยังไม่ถึงเป้าหมาย 10%<br>ยอดเงินคงเหลือปัจจุบันของคุณคือ <span class="balance-val" style="color:#e65100">${balance.toLocaleString()}</span> บาท`;
+            box.style.background = "#fff3e0"; box.style.borderColor = "#ff9800";
+            analysisEl.innerHTML = `⚠️ เงินออมยังไม่ถึงเป้าหมาย 10%<br>ยอดเงินคงเหลือปัจจุบันคือ <b style="color:#e65100">${balance.toLocaleString()}</b> บาท`;
         } else {
-            box.style.background = "#ffebee";
-            box.style.borderColor = "var(--expense)";
-            analysisEl.innerHTML = `❌ <b>วิกฤต! คุณไม่มีเงินออมเหลือเลย</b><br>ยอดเงินคงเหลือปัจจุบันของคุณคือ <span class="balance-val" style="color:#c62828">${balance.toLocaleString()}</span> บาท`;
+            box.style.background = "#ffebee"; box.style.borderColor = "#e74c3c";
+            analysisEl.innerHTML = `❌ <b>วิกฤต! คุณไม่มีเงินออมเหลือเลย</b><br>ยอดเงินคงเหลือปัจจุบันคือ <b style="color:#c62828">${balance.toLocaleString()}</b> บาท`;
         }
     }
 
@@ -156,38 +185,20 @@
         const top5 = [...expenses].sort((a, b) => b.amt - a.amt).slice(0, 5);
         list.innerHTML = '';
         top5.forEach((item, i) => {
-            list.innerHTML += `<div class="top-item"><span>${i+1}. ${item.desc}</span><b>${item.amt.toLocaleString()}</b></div>`;
+            list.innerHTML += `<div style="display:flex; justify-content:space-between; font-size:0.9rem; padding:4px 0;"><span>${i+1}. ${item.desc}</span><b>${item.amt.toLocaleString()}</b></div>`;
         });
-    }
-
-    function updateGrade(inc, exp) {
-        const box = document.getElementById('gradeBox');
-        const letter = document.getElementById('gradeLetter');
-        if (inc === 0) { letter.innerText = "-"; return; }
-        const ratio = (exp / inc) * 100;
-        let g, cl;
-        if (ratio <= 35) { g='A'; cl='status-A'; }
-        else if (ratio <= 50) { g='B'; cl='status-B'; }
-        else if (ratio <= 75) { g='C'; cl='status-C'; }
-        else if (ratio <= 95) { g='D'; cl='status-D'; }
-        else { g='F'; cl='status-F'; }
-        box.className = 'grade-card ' + cl;
-        letter.innerText = g;
-        document.getElementById('gradeLabel').innerText = `ใช้จ่ายไป ${ratio.toFixed(0)}% ของรายรับ`;
     }
 
     function updateChart(data) {
         const ctx = document.getElementById('myChart').getContext('2d');
         if (chartObj) chartObj.destroy();
         const summary = data.reduce((acc, curr) => {
-            const key = curr.desc;
-            if (!acc[key]) acc[key] = { amt: 0, type: curr.type };
-            acc[key].amt += curr.amt;
+            acc[curr.desc] = (acc[curr.desc] || 0) + curr.amt;
             return acc;
         }, {});
         const labels = Object.keys(summary);
-        const values = labels.map(l => summary[l].amt);
-        const colors = labels.map(l => summary[l].type === 'inc' ? '#2ecc71' : '#e74c3c');
+        const values = Object.values(summary);
+        const colors = labels.map(l => data.find(d=>d.desc===l).type === 'inc' ? '#2ecc71' : '#e74c3c');
         chartObj = new Chart(ctx, {
             type: 'pie',
             data: { labels: labels, datasets: [{ data: values, backgroundColor: colors }] },
@@ -201,21 +212,13 @@
         const t = document.getElementById('type').value;
         if(!d || isNaN(a)) return;
         db.unshift({ desc: d, amt: a, type: t });
-        localStorage.setItem('my_wallet_v8', JSON.stringify(db));
-        document.getElementById('desc').value = '';
-        document.getElementById('amt').value = '';
+        localStorage.setItem('my_wallet_v9', JSON.stringify(db));
+        document.getElementById('desc').value = ''; document.getElementById('amt').value = '';
         render();
     };
 
-    function deleteItem(index) {
-        if(confirm('ลบรายการนี้?')) {
-            db.splice(index, 1);
-            localStorage.setItem('my_wallet_v8', JSON.stringify(db));
-            render();
-        }
-    }
-
-    function resetData() { if(confirm('ล้างข้อมูลทั้งหมด?')) { db=[]; localStorage.removeItem('my_wallet_v8'); render(); } }
+    function deleteItem(index) { if(confirm('ลบรายการนี้?')) { db.splice(index, 1); localStorage.setItem('my_wallet_v9', JSON.stringify(db)); render(); } }
+    function resetData() { if(confirm('ล้างข้อมูลทั้งหมด?')) { db=[]; localStorage.removeItem('my_wallet_v9'); render(); } }
     window.onload = render;
 </script>
 
