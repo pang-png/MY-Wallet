@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Health Grade</title>
+    <title>Financial Grade Wallet</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #4a90e2; --income: #2ecc71; --expense: #e74c3c; --bg: #f4f7f9; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
-        .container { max-width: 480px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .container { max-width: 480px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         
         /* การ์ดเกรด */
         .grade-card { padding: 25px; border-radius: 15px; text-align: center; color: white; margin-bottom: 20px; background: #999; transition: 0.5s; }
@@ -24,12 +24,14 @@
         .stats { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 15px; }
         .stats div { text-align: center; }
         
-        input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; box-sizing: border-box; }
+        input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; box-sizing: border-box; outline: none; }
+        input:focus { border-color: var(--primary); }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; border-bottom: 4px solid #357abd; }
-        button:active { margin-top: 10px; border-bottom: 0; }
+        button:active { border-bottom: 0; transform: translateY(4px); }
         
         .history { margin-top: 25px; border-top: 2px solid #eee; padding-top: 15px; }
-        .item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; }
+        .item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; align-items: center; }
+        .del-btn { width: auto; padding: 5px 10px; background: #ff4d4d1a; color: #ff4d4d; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -38,8 +40,8 @@
     <div id="gradeBox" class="grade-card">
         <div style="font-weight: bold;">เกรดสุขภาพการเงิน</div>
         <div id="gradeLetter" class="grade-letter">-</div>
-        <div id="gradeLabel" style="font-size: 1.2rem; font-weight: bold;">รอข้อมูล</div>
-        <div id="adviceText" class="advice">เริ่มบันทึกรายรับ-รายจ่ายเพื่อดูเกรดและแนวทางแก้ไข</div>
+        <div id="gradeLabel" style="font-size: 1.2rem; font-weight: bold;">กรุณาบันทึกข้อมูล</div>
+        <div id="adviceText" class="advice">พิมพ์รายการและจำนวนเงินด้านล่าง เพื่อวิเคราะห์ความเสี่ยง</div>
     </div>
 
     <div class="stats">
@@ -47,13 +49,13 @@
         <div>รายจ่าย<br><b id="totalExp" style="color:var(--expense)">0</b></div>
     </div>
 
-    <div style="max-width: 200px; margin: auto;">
+    <div style="max-width: 180px; margin: auto;">
         <canvas id="myChart"></canvas>
     </div>
 
     <div style="margin-top: 20px;">
-        <input type="text" id="desc" placeholder="รายการ">
-        <input type="number" id="amt" placeholder="จำนวนเงิน">
+        <input type="text" id="desc" placeholder="รายการ (เช่น ค่าอาหาร)">
+        <input type="text" id="amt" placeholder="จำนวนเงิน" oninput="formatNumber(this)">
         <select id="type">
             <option value="exp">🔴 รายจ่าย</option>
             <option value="inc">🟢 รายรับ</option>
@@ -62,26 +64,35 @@
     </div>
 
     <div id="historyList" class="history"></div>
-    <button onclick="resetData()" style="background:#eee; color:#666; font-size:0.7rem; border:none; margin-top:50px;">ล้างข้อมูลทั้งหมด</button>
+    <button onclick="resetData()" style="background:none; color:#bbb; border:none; margin-top:40px; font-size:0.7rem; border-bottom:1px solid #eee;">ล้างข้อมูลเครื่องนี้</button>
 </div>
 
 <script>
-    let db = JSON.parse(localStorage.getItem('my_wallet_vfinal')) || [];
+    let db = JSON.parse(localStorage.getItem('my_wallet_v5')) || [];
     let chartObj = null;
+
+    // ฟังก์ชันจัดรูปแบบตัวเลขขณะพิมพ์
+    function formatNumber(input) {
+        let value = input.value.replace(/\D/g, ""); // ลบทุกอย่างที่ไม่ใช่ตัวเลข
+        input.value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ","); // ใส่คอมม่า
+    }
 
     function render() {
         const list = document.getElementById('historyList');
         let inc = 0, exp = 0;
         list.innerHTML = '<b>ประวัติรายการ:</b>';
 
-        db.forEach(item => {
+        db.forEach((item, index) => {
             if(item.type === 'inc') inc += item.amt; else exp += item.amt;
             list.innerHTML += `
                 <div class="item">
                     <span>${item.desc}</span>
-                    <b style="color:${item.type === 'inc' ? '#2ecc71' : '#e74c3c'}">
-                        ${item.type === 'inc' ? '+' : '-'}${item.amt.toLocaleString()}
-                    </b>
+                    <div style="text-align:right">
+                        <b style="color:${item.type === 'inc' ? '#2ecc71' : '#e74c3c'}">
+                            ${item.type === 'inc' ? '+' : '-'}${item.amt.toLocaleString()}
+                        </b>
+                        <br><span onclick="deleteItem(${index})" style="color:#ccc; font-size:0.7rem; cursor:pointer">ลบ</span>
+                    </div>
                 </div>`;
         });
 
@@ -103,11 +114,11 @@
         const ratio = (exp / inc) * 100;
         let g, lb, ad, cl;
 
-        if (ratio <= 30) { g='A'; lb='ดีเยี่ยม'; cl='status-A'; ad='💡 แนวทาง: สภาพคล่องดีมาก นำเงินส่วนที่เหลือไปลงทุนต่อยอด'; }
-        else if (ratio <= 50) { g='B'; lb='ดี'; cl='status-B'; ad='💡 แนวทาง: บริหารเงินได้ดี ควรสำรองเงินฉุกเฉินให้ครบ 6 เดือน'; }
-        else if (ratio <= 75) { g='C'; lb='เริ่มเสี่ยง'; cl='status-C'; ad='⚠️ ความเสี่ยง: ออมน้อยไปหน่อย ลองตัดรายจ่ายฟุ่มเฟือยออก 10%'; }
-        else if (ratio <= 95) { g='D'; lb='อันตราย'; cl='status-D'; ad='🚨 ความเสี่ยง: เงินเดือนเกือบชนเดือน ห้ามสร้างหนี้ใหม่เด็ดขาด'; }
-        else { g='F'; lb='วิกฤต'; cl='status-F'; ad='❌ วิกฤต: รายจ่ายท่วมรายรับ รีบจดบันทึกและลดค่าใช้จ่ายทันที'; }
+        if (ratio <= 35) { g='A'; lb='ดีเยี่ยม'; cl='status-A'; ad='💡 แนวทาง: สภาพคล่องดีมาก เงินส่วนที่เหลือควรนำไปลงทุนหรือออมเพื่อเกษียณ'; }
+        else if (ratio <= 50) { g='B'; lb='ดี'; cl='status-B'; ad='💡 แนวทาง: บริหารเงินได้ดีเยี่ยม ควรสำรองเงินฉุกเฉินให้ครบ 3-6 เท่าของรายจ่าย'; }
+        else if (ratio <= 75) { g='C'; lb='พอใช้'; cl='status-C'; ad='⚠️ ความเสี่ยง: ออมน้อยไปนิด ลองลดรายจ่ายที่ไม่จำเป็นออกสัก 10% ดูครับ'; }
+        else if (ratio <= 95) { g='D'; lb='เสี่ยง'; cl='status-D'; ad='🚨 ความเสี่ยงสูง: เงินเดือนแทบไม่เหลือออม ห้ามสร้างหนี้ใหม่และลดการกินหรูทันที'; }
+        else { g='F'; lb='วิกฤต'; cl='status-F'; ad='❌ วิกฤต: รายจ่ายเกินรายรับแล้ว! รีบตรวจสอบหนี้สินและตัดค่าใช้จ่ายฟุ่มเฟือยด่วน'; }
 
         box.className = 'grade-card ' + cl;
         letter.innerText = g;
@@ -121,29 +132,50 @@
         chartObj = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['รับ', 'จ่าย'],
-                datasets: [{ data: [inc || 1, exp], backgroundColor: ['#2ecc71', '#e74c3c'] }]
+                labels: ['รายรับ', 'รายจ่าย'],
+                datasets: [{ 
+                    data: [inc || 1, exp], 
+                    backgroundColor: ['#2ecc71', '#e74c3c'],
+                    borderWidth: 0
+                }]
             },
-            options: { plugins: { legend: { display: false } } }
+            options: { 
+                plugins: { legend: { display: false } },
+                cutout: '80%'
+            }
         });
     }
 
     document.getElementById('addBtn').onclick = function() {
         const d = document.getElementById('desc').value;
-        const a = parseFloat(document.getElementById('amt').value);
+        const rawAmt = document.getElementById('amt').value.replace(/,/g, "");
+        const a = parseFloat(rawAmt);
         const t = document.getElementById('type').value;
 
-        if(!d || !a) { alert('กรุณากรอกข้อมูล'); return; }
+        if(!d || isNaN(a)) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
 
         db.unshift({ desc: d, amt: a, type: t });
-        localStorage.setItem('my_wallet_vfinal', JSON.stringify(db));
+        localStorage.setItem('my_wallet_v5', JSON.stringify(db));
         
         document.getElementById('desc').value = '';
         document.getElementById('amt').value = '';
         render();
     };
 
-    function resetData() { if(confirm('ลบข้อมูลทั้งหมด?')) { db = []; localStorage.removeItem('my_wallet_vfinal'); render(); } }
+    function deleteItem(index) {
+        if(confirm('ต้องการลบรายการนี้ใช่ไหม?')) {
+            db.splice(index, 1);
+            localStorage.setItem('my_wallet_v5', JSON.stringify(db));
+            render();
+        }
+    }
+
+    function resetData() { 
+        if(confirm('ลบข้อมูลทั้งหมดในเครื่องนี้?')) { 
+            db = []; localStorage.removeItem('my_wallet_v5'); 
+            render(); 
+        } 
+    }
 
     window.onload = render;
 </script>
